@@ -75,8 +75,14 @@ impl Site{
         Console::print_color("Enter site name:".blue());
         let title = Console::input();
 
-        Site::save_new_site(title.clone());
-        Console::clear();
-        Console::success(format!("The site '{}' has been added", title).as_str());
+        if title != "0"{            
+            Site::save_new_site(title.clone());
+            Console::clear();
+            Console::success(format!("The site '{}' has been added", title).as_str());
+        }
+        else{
+            Console::clear();
+        }
+
     }
 }

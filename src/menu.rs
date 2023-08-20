@@ -53,7 +53,7 @@ impl Menu {
                     }
                     else{
                         index +=1;
-                        str += &format!("{}) {}\n", index, item.name).to_string();
+                        str += &format!("🔹 {}) {}\n", index, item.name).to_string();
                     }
 
                 }
@@ -78,13 +78,13 @@ impl Menu {
 
         match current {
             Some(menu)=>{
-                println!("### {}\n",menu.description.clone().dark_cyan());
+                println!("💬 {}\n",menu.description.clone().dark_cyan());
                 println!("{}", text);
         
                 self.get_input();
             }
             None=>{
-
+                println!("Menu not found");
             }
         }
 
@@ -92,7 +92,7 @@ impl Menu {
     }
 
     pub fn get_input(&mut self){
-        Console::print_color("Chose Menu Number: ".blue());
+        Console::print_color("Enter the menu number: ".blue());
         let select = Console::input();
 
         if select == "0"{
@@ -121,8 +121,8 @@ impl Menu {
             Err(_)=>{}
         }
 
-        println!("check befor name {}  action{:?}", &current.list[number_select].name, &current.list[number_select].has_action);
 
+        
         if valid_convert && current.list.get(number_select).is_some() && current.list[number_select].has_action == false{
 
             let item = &current.list[number_select];
@@ -131,11 +131,21 @@ impl Menu {
         }
         else if current.list.get(number_select).is_some() && current.list[number_select].has_action == true{
             let item = &current.list[number_select];
-            println!("else");
+
             if item.action == "add_site" {
                 Site::process_save_new();
                 self.show_current_menu(false);
             }
+            else if item.action == "close_app"{
+                Console::println_color("Goodbay 👋".green());
+                std::process::exit(0);
+            }
+        }
+        else{
+            Console::clear();
+            Console::warning("Menu not found");
+            println!();
+            self.show_current_menu(false);
         }
 
 

@@ -30,6 +30,7 @@ fn main() {
     menu_list.add("HLS",false, "","");
     menu_list.add("Settings",false,"","site_settings");
     menu_list.add("Sites",false,"","sites");
+    menu_list.add("Exit",true,"close_app","sites");
 
     menu.add(menu_list);
 
@@ -51,18 +52,5 @@ fn main() {
     
     menu.show_current_menu(true);
 
-    // let mut menu = Menu::new();
-
-    // menu.make_menu_main();
-    // menu.make_menu_sites();
-    
-    // menu.show_current_menu();
-
-    // let mut menu_state = MenuStatus::new();
-    // let mut menu = Menu::new();
-
-    // menu.show_menu_main();
-
-    // println!("state:{}", menu.get_state())
     
 }

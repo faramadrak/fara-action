@@ -36,6 +36,11 @@ impl Console{
         Console::println_color(format!("✅ {}", text).as_str().green());
     }
 
+    pub fn warning(text :&str){
+        Console::println_color(format!("🔔 {}", text).as_str().yellow());
+    }
+    
+
 
     pub fn input()->String{
         
