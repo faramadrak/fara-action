@@ -39,6 +39,10 @@ impl Console{
     pub fn warning(text :&str){
         Console::println_color(format!("🔔 {}", text).as_str().yellow());
     }
+
+    pub fn error(text: &str){
+        Console::print_color(format!("❌ {}", text).as_str().red());
+    }
     
 
 
@@ -49,6 +53,25 @@ impl Console{
         io::stdin().read_line(&mut input).unwrap();
 
         return input.trim().to_string();
+    }
+
+
+    pub fn to_number(number_str:String)->(bool,usize){
+        let result = number_str.parse::<usize>();
+        let mut valid = false;
+        let mut number = 0;
+        
+        match result {
+            Ok(num)=>{
+                valid = true;
+                number = num;
+            }
+            Err(_)=>{
+                valid = false;
+            }
+        }
+
+        (valid,number)
     }
 
     

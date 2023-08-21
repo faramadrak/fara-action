@@ -4,6 +4,7 @@ use crate::MenuList;
 use crate::MenuItem;
 use crate::Console;
 use crate::site::Site;
+use crate::hls::HLS;
 
 pub struct Menu{
     list:Vec<MenuList>,
@@ -78,7 +79,11 @@ impl Menu {
 
         match current {
             Some(menu)=>{
-                println!("💬 {}\n",menu.description.clone().dark_cyan());
+                if Site::get_current().is_some(){
+                    println!("🌐 {} 🔻", Site::get_current().unwrap().title.blue().bold());
+                    println!();
+                }
+                println!(" 💬 {}\n",menu.description.clone().dark_cyan());
                 println!("{}", text);
         
                 self.get_input();
@@ -140,6 +145,17 @@ impl Menu {
                 Console::println_color("Goodbay 👋".green());
                 std::process::exit(0);
             }
+            else if item.action == "select_a_site"{
+                Site::show_site_list_and_select();
+                self.clear_history();
+                self.show_current_menu(true);
+            }
+            else if item.action == "select_hls_key_file"{
+                HLS::select_key_file();
+            }
+            else if item.action == "create_new_hls_key"{
+                HLS::create_new_key();
+            }
         }
         else{
             Console::clear();
@@ -156,6 +172,14 @@ impl Menu {
         if self.history.len()> 1 {
             self.history.pop();
         }
+        
+        self.current = self.history.last().unwrap().to_string();
+
+    }
+
+    pub fn clear_history(&mut self){
+
+        self.history = vec!["main".to_string()];
         
         self.current = self.history.last().unwrap().to_string();
 
