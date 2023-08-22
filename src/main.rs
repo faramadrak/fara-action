@@ -23,7 +23,7 @@ fn main() {
 
 
     let mut menu_list = MenuList::new("main", "Site manage");
-    menu_list.add("HLS",false, "","");
+    menu_list.add("HLS",true, "hls_all","");
     menu_list.add("Settings",false,"","site_settings");
     menu_list.add("Sites",false,"","sites");
     menu_list.add("Exit",true,"close_app","sites");

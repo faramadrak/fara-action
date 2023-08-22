@@ -156,6 +156,9 @@ impl Menu {
             else if item.action == "create_new_hls_key"{
                 HLS::create_new_key();
             }
+            else if item.action == "hls_all"{
+                HLS::start_all_video();
+            }
         }
         else{
             Console::clear();
