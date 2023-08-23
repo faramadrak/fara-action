@@ -1,5 +1,7 @@
 use std::env;
+use std::f32::consts::E;
 use std::fs;
+use std::fs::metadata;
 use std::fs::File;
 use std::io;
 use std::io::stdout;
@@ -26,6 +28,7 @@ use crate::console::Console;
 use crate::Site;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use std::os::unix::fs::PermissionsExt;
 
 pub struct HLS {}
 
@@ -52,18 +55,163 @@ impl HLS {
         if current.is_some() {
             path = path.join(current.unwrap().title);
 
-            fs::create_dir(&path);
+            let _ = fs::create_dir(&path);
 
-            let video = fs::create_dir(&path.join("videos"));
+            let ـ = fs::create_dir(&path.join("videos"));
             let _ = fs::create_dir(&path.join("hls_videos"));
             let _ = fs::create_dir(&path.join("config"));
+        }
+    }
 
-            match video {
-                Ok(()) => {}
-                Err(err) => {
-                    println!("{}", path.display());
-                    println!("{}", err)
+    fn get_video_list_text() -> (Option<String>, usize) {
+        let video_path = HLS::site_dir_path().join("videos");
+
+        let files = video_path.read_dir();
+
+        if files.is_err() {
+            Console::clear();
+            Console::error("The program does not have permission to access and create files.");
+            return (None, 0);
+        }
+
+        let mut text = String::new();
+        let mut file_index = 0;
+
+        for file in files.unwrap() {
+            if file.is_ok() {
+                let dfile = file.ok().unwrap();
+                let file_name = &dfile.file_name();
+                let buf = &dfile.path().clone();
+                let ext = buf.extension();
+
+                file_index += 1;
+
+                let mut support = false;
+
+                if ext.is_some() {
+                    let ex = ext.unwrap();
+
+                    if ex.eq("mp4") {
+                        text += &format!("🎬 {}. {}\n", file_index, file_name.to_str().unwrap());
+                        support = true;
+                    }
                 }
+
+                if support == false {
+                    text += &format!(
+                        "⛔️ {}. {} {}\n",
+                        file_index,
+                        file_name.to_str().unwrap(),
+                        "Not support".red()
+                    );
+                }
+            }
+        }
+        (Some(text), file_index)
+    }
+
+    pub fn remove_all_org_videos() {
+        let (text, count) = HLS::get_video_list_text();
+
+        Console::clear();
+        Console::warning("Delete all files above?");
+
+        println!();
+        println!("{}",text.unwrap());
+        println!();
+
+
+
+        Console::print_color("Enter 'yes' to delete: ".red().bold());
+
+        let answer = Console::input();
+
+        Console::clear();
+
+        if answer.to_lowercase() == "yes" {
+            let path = HLS::site_dir_path().join("videos");
+            let result = fs::remove_dir_all(&path);
+            fs::create_dir_all(path);
+
+            if result.is_ok(){
+                Console::success("All files were deleted\n");
+            }
+            else{
+                println!("{:?}", result.err().unwrap().to_string());
+                Console::error("The operation failed \n");
+            }
+        }
+    }
+
+    pub fn show_files_list() {
+        let (text, file_index) = HLS::get_video_list_text();
+
+        if text.is_none() {
+            return;
+        }
+
+        let text = text.unwrap();
+
+        Console::clear();
+
+        if file_index == 0 {
+            Console::warning("No video found\n");
+        } else {
+            Console::println_color("List of videos".blue().bold());
+            println!();
+            println!("{}", text);
+            Console::print("(Enter to back)");
+            Console::input();
+            Console::clear();
+        }
+    }
+
+    pub fn add_a_video() {
+        let video_path = HLS::site_dir_path().join("videos");
+
+        let files_path = FileDialog::new()
+            .set_location("~/Downloads")
+            .add_filter("Select mp4 video", &["mp4"])
+            .show_open_multiple_file()
+            .unwrap();
+
+        let mut import_count = 0;
+
+        for path in &files_path {
+            println!("path:{}", path.display().to_string());
+            let copy_result = fs::copy(path, &video_path.join(path.file_name().unwrap()));
+
+            if copy_result.is_ok() {
+                import_count += 1;
+            }
+        }
+
+        let select_count = files_path.len();
+        Console::clear();
+
+        if select_count > 0 {
+            if import_count == 0 {
+                Console::warning("No files were added");
+                let md = fs::metadata(video_path);
+                match md {
+                    Ok(meta) => {
+                        let permissions = meta.permissions();
+                        let readonly = permissions.readonly();
+
+                        if readonly {
+                            Console::warning(
+                                "The program does not have permission to access and create files",
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        Console::warning(
+                            "The program does not have permission to access and create files.",
+                        );
+                    }
+                }
+            } else {
+                Console::success(&format!(" {} videos were added", import_count).to_string());
             }
         }
     }
@@ -85,15 +233,14 @@ impl HLS {
 
         let mut index = 0;
 
-
         for result in files {
             index += 1;
 
             match result {
                 Ok(file) => {
-                    let file_path:String = file.path().display().to_string();
+                    let file_path: String = file.path().display().to_string();
                     let file_name = file.file_name();
-            
+
                     println!();
 
                     println!(
@@ -118,54 +265,63 @@ impl HLS {
                         file_name.as_os_str().to_str().unwrap().blue().bold()
                     );
 
-                    for res in vec![360,480,720]{
+                    for res in vec![360, 480, 720] {
                         let height = (res * 9 / 16) * 2;
 
-                        let file_path:String = file.path().display().to_string();
+                        let file_path: String = file.path().display().to_string();
                         let save_path = hls_video_path.join(&file_name);
 
                         let status_text = "🔄  Processing video ".yellow().bold();
                         let mut stdout: Stdout = stdout();
                         let mut index_sec = 0;
-                        
-                        
+
                         let result_status = Arc::new(Mutex::new(true));
                         let result_status_clone = Arc::clone(&result_status);
 
                         let status_run = Arc::new(Mutex::new(true));
                         let status_run_clone = Arc::clone(&status_run);
-    
-                        let timer = thread::spawn( move || {
-                            // let res = 480;
-    
-                            let output = Command::new("ffmpeg").arg("-i")
-                        .arg(file_path)
-                        .arg("-c:a")
-                        .arg("aac")
-                        .arg("-strict")
-                        .arg("experimental")
-                        .arg("-c:v")
-                        .arg("libx264")
-                        .arg("-s")
-                        // .arg(format!("{}x{}", res, res * 9 / 16)) 
-                        .arg(format!("{}x{}", res, height)) // Use the calculated height
 
-                        .arg("-aspect")
-                        .arg("16:9")
-                        .arg("-f")
-                        .arg("hls")
-                        .arg("-hls_list_size")
-                        .arg("1000000")
-                        .arg("-hls_time")
-                        .arg("2")
-                        .arg("-hls_key_info_file")
-                        .arg(HLS::site_dir_path().join("config").join("enc.keyinfo").display().to_string())
-                        .arg(format!("{}/video'.{}p.m3u8",save_path.display().to_string(), res))
-                        // .stdout(Stdio::piped())
-                        // .stderr(Stdio::inherit())
-                        .output()
-                        .unwrap();
-    
+                        let timer = thread::spawn(move || {
+                            // let res = 480;
+
+                            let output = Command::new("ffmpeg")
+                                .arg("-i")
+                                .arg(file_path)
+                                .arg("-c:a")
+                                .arg("aac")
+                                .arg("-strict")
+                                .arg("experimental")
+                                .arg("-c:v")
+                                .arg("libx264")
+                                .arg("-s")
+                                // .arg(format!("{}x{}", res, res * 9 / 16))
+                                .arg(format!("{}x{}", res, height)) // Use the calculated height
+                                .arg("-aspect")
+                                .arg("16:9")
+                                .arg("-f")
+                                .arg("hls")
+                                .arg("-hls_list_size")
+                                .arg("1000000")
+                                .arg("-hls_time")
+                                .arg("2")
+                                .arg("-hls_key_info_file")
+                                .arg(
+                                    HLS::site_dir_path()
+                                        .join("config")
+                                        .join("enc.keyinfo")
+                                        .display()
+                                        .to_string(),
+                                )
+                                .arg(format!(
+                                    "{}/video'.{}p.m3u8",
+                                    save_path.display().to_string(),
+                                    res
+                                ))
+                                // .stdout(Stdio::piped())
+                                // .stderr(Stdio::inherit())
+                                .output()
+                                .unwrap();
+
                             if output.status.success() {
                                 let mut run_mutex = status_run_clone.lock().unwrap();
                                 *run_mutex = false;
@@ -181,37 +337,50 @@ impl HLS {
                                 );
                             }
                         });
-    
+
                         loop {
                             stdout.queue(cursor::SavePosition).unwrap();
                             stdout
                                 .write_all(
-                                    format!("   {} ({})", status_text, HLS::format_duration(index_sec))
-                                        .as_bytes(),
+                                    format!(
+                                        "   {} ({})",
+                                        status_text,
+                                        HLS::format_duration(index_sec)
+                                    )
+                                    .as_bytes(),
                                 )
                                 .unwrap();
                             stdout.queue(cursor::RestorePosition).unwrap();
                             stdout.flush().unwrap();
                             thread::sleep(time::Duration::from_secs(1));
-    
+
                             stdout.queue(cursor::RestorePosition).unwrap();
                             stdout
                                 .queue(terminal::Clear(terminal::ClearType::FromCursorDown))
                                 .unwrap();
                             index_sec += 1;
-    
+
                             let run_mutex = *status_run.lock().unwrap();
                             if run_mutex == false {
                                 break;
                             }
                         }
                         stdout.execute(cursor::Show).unwrap();
-    
+
                         if *result_status.lock().unwrap() {
-                            println!("   ✅  {} {} pixel in {}","Created".green().bold(), res.to_string().green().bold() , HLS::format_duration(index_sec) );
-                        }
-                        else{
-                            println!("   ❌  {} {} pixel in {}","Error".red().bold(), res.to_string().red().bold() , HLS::format_duration(index_sec) );   
+                            println!(
+                                "   ✅  {} {} pixel in {}",
+                                "Created".green().bold(),
+                                res.to_string().green().bold(),
+                                HLS::format_duration(index_sec)
+                            );
+                        } else {
+                            println!(
+                                "   ❌  {} {} pixel in {}",
+                                "Error".red().bold(),
+                                res.to_string().red().bold(),
+                                HLS::format_duration(index_sec)
+                            );
                         }
 
                         timer.join().unwrap();

@@ -23,10 +23,21 @@ fn main() {
 
 
     let mut menu_list = MenuList::new("main", "Site manage");
-    menu_list.add("HLS",true, "hls_all","");
+    menu_list.add("HLS",false, "","hls");
     menu_list.add("Settings",false,"","site_settings");
     menu_list.add("Sites",false,"","sites");
     menu_list.add("Exit",true,"close_app","sites");
+
+    menu.add(menu_list);
+
+
+    let mut menu_list = MenuList::new("hls", "HLS Action");
+    menu_list.add("Start Connvert",true, "hls_all","");
+    menu_list.add("Show List",true, "show_all_video_list","");
+    menu_list.add("Add Video",true,"import_new_video","site_settings");
+    menu_list.add("Remove all original videos",true,"remove_all_org_videos","");
+    menu_list.add("Remove all hls videos",true,"remove_all_hls_videos","");
+    menu_list.add("Back",true,"close_app","sites");
 
     menu.add(menu_list);
 

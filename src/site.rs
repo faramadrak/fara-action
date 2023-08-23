@@ -48,6 +48,10 @@ impl Site {
 
         let config_path = Site::get_config_file_path();
 
+        if config_path.exists() == false{
+            Site::save_config(SiteListJson { sites: vec![], current: "".to_string() })
+        }
+
         // open config file
         let mut config_file = File::open(&config_path).expect("Can not open config file");
 

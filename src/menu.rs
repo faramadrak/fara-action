@@ -47,10 +47,12 @@ impl Menu {
                 let mut index = 0;
 
                 for item in &menu.list{
-                    
+                    //     index +=1;
+                    // str += &format!("🔹 {}) {}\n", index, item.name).to_string();                    
                     if item.name == "Back"{
-                        println!("{}","0) Back".yellow());
-                        println!();
+                        // println!("{}","0) Back".yellow());
+                        // println!();
+                        str += &format!("◀️  {}) {}\n", 0, "Back").to_string();
                     }
                     else{
                         index +=1;
@@ -158,6 +160,18 @@ impl Menu {
             }
             else if item.action == "hls_all"{
                 HLS::start_all_video();
+            }
+            else if item.action == "import_new_video"{
+                HLS::add_a_video();
+                self.show_current_menu(false)
+            }
+            else if item.action == "show_all_video_list"{
+                HLS::show_files_list();
+                self.show_current_menu(false)
+            }
+            else if item.action == "remove_all_org_videos"{
+                HLS::remove_all_org_videos();
+                self.show_current_menu(false)
             }
         }
         else{

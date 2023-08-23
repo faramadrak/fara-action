@@ -41,8 +41,9 @@ impl Console{
     }
 
     pub fn error(text: &str){
-        Console::print_color(format!("❌ {}", text).as_str().red());
+        Console::println_color(format!("❌ {}", text).as_str().red());
     }
+
     
 
 
