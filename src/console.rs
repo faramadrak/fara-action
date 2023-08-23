@@ -16,6 +16,12 @@ impl Console{
         .execute(cursor::MoveTo(0, 0)).unwrap();
     }
 
+    pub fn continue_input(){
+        println!();
+        Console::print("(Enter to continue)");
+        Console::input();
+    }
+
 
     pub fn print(text :&str){
         print!("{}", text);

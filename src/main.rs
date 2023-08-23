@@ -58,7 +58,7 @@ fn main() {
 
 
     let mut menu_list = MenuList::new("hls_settings", "Site HLS settings");
-    menu_list.add("KeyInfo File",true,"select_hls_key_file","");
+    menu_list.add("Select Config Files (enc.keyinfo, enc.key)",true,"select_hls_key_file","");
     menu_list.add("Create New keyInfo",true,"create_new_hls_key","");
     // menu_list.add("HLS",false,"","");
     // menu_list.add("Watermark",false,"","");

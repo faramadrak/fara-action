@@ -1,10 +1,12 @@
 use std::env;
+use std::error::Error;
 use std::f32::consts::E;
 use std::fs;
 use std::fs::metadata;
 use std::fs::File;
 use std::io;
 use std::io::stdout;
+use std::io::Read;
 use std::io::Stdout;
 use std::io::Write;
 use std::path::PathBuf;
@@ -17,6 +19,7 @@ use std::thread::JoinHandle;
 use std::time;
 use std::time::Duration;
 
+use chrono::Local;
 use crossterm::cursor;
 use crossterm::style::Stylize;
 use crossterm::terminal;
@@ -29,10 +32,79 @@ use crate::Site;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::os::unix::fs::PermissionsExt;
+// use hex_literal::hex;
+
+pub struct HLS_Log {
+    date_time: String,
+    video_name: String,
+    Video_hash: String,
+}
+
+pub struct HLS_list_log {
+    list: Vec<HLS_Log>,
+}
 
 pub struct HLS {}
 
 impl HLS {
+    fn add_text_to_log(file_path: &PathBuf)->String {
+        let file_name = &file_path.file_name().unwrap();
+        let site_path = HLS::site_dir_path();
+        let log_path = site_path.join("config").join("hls.logs.json");
+
+        let current_datetime = Local::now();
+        let formatted_datetime = current_datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        if log_path.exists() == false {
+            let log_file = fs::write(&log_path, "");
+        }
+
+        let mut get_log_file = fs::read_to_string(&log_path).unwrap();
+
+        let hash = HLS::file_md5(&file_path.display().to_string());
+        let new_log_text = format!(
+            "Date Time : {}\nFile : '{}'\nhash : {}\n\n",
+            formatted_datetime,
+            file_name.to_str().unwrap().to_string(),
+            &hash,
+        );
+
+        let lines:Vec<&str> = get_log_file.lines().collect();
+        let count = lines.len();
+
+
+        
+        if count > 40{
+            let mut new_lines = String::new();
+            for (i,line) in lines.iter().enumerate(){
+                if i > 40{
+                    break;
+                }
+                new_lines.push_str(&line);
+                new_lines.push_str("\n");
+
+            }
+
+            get_log_file = new_lines;
+        }
+
+        get_log_file = format!("{}{}",new_log_text, get_log_file); 
+
+        let _ = fs::write(log_path, get_log_file);
+        hash
+    }
+
+    fn file_md5(file_path: &str) -> String {
+        let mut file = File::open(file_path).unwrap();
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).unwrap();
+
+        let digest = md5::compute(buffer);
+        let hash = format!("{:?}", digest);
+
+        hash
+    }
+
     fn root_path() -> PathBuf {
         let mut path = env::current_exe().expect("Not access in hls");
         path.pop();
@@ -63,8 +135,8 @@ impl HLS {
         }
     }
 
-    fn get_video_list_text() -> (Option<String>, usize) {
-        let video_path = HLS::site_dir_path().join("videos");
+    fn get_video_list_text(directory: &str) -> (Option<String>, usize) {
+        let video_path = HLS::site_dir_path().join(directory);
 
         let files = video_path.read_dir();
 
@@ -111,16 +183,14 @@ impl HLS {
     }
 
     pub fn remove_all_org_videos() {
-        let (text, count) = HLS::get_video_list_text();
+        let (text, count) = HLS::get_video_list_text("videos");
 
         Console::clear();
         Console::warning("Delete all files above?");
 
         println!();
-        println!("{}",text.unwrap());
+        println!("{}", text.unwrap());
         println!();
-
-
 
         Console::print_color("Enter 'yes' to delete: ".red().bold());
 
@@ -133,10 +203,39 @@ impl HLS {
             let result = fs::remove_dir_all(&path);
             fs::create_dir_all(path);
 
-            if result.is_ok(){
+            if result.is_ok() {
                 Console::success("All files were deleted\n");
+            } else {
+                println!("{:?}", result.err().unwrap().to_string());
+                Console::error("The operation failed \n");
             }
-            else{
+        }
+    }
+
+    pub fn remove_all_hls_videos() {
+        let (text, count) = HLS::get_video_list_text("hls_videos");
+
+        Console::clear();
+        Console::warning("Delete all files above? (HLS Files)");
+
+        println!();
+        println!("{}", text.unwrap());
+        println!();
+
+        Console::print_color("Enter 'yes' to delete: ".red().bold());
+
+        let answer = Console::input();
+
+        Console::clear();
+
+        if answer.to_lowercase() == "yes" {
+            let path = HLS::site_dir_path().join("hls_videos");
+            let result = fs::remove_dir_all(&path);
+            fs::create_dir_all(path);
+
+            if result.is_ok() {
+                Console::success("All files were deleted\n");
+            } else {
                 println!("{:?}", result.err().unwrap().to_string());
                 Console::error("The operation failed \n");
             }
@@ -144,7 +243,7 @@ impl HLS {
     }
 
     pub fn show_files_list() {
-        let (text, file_index) = HLS::get_video_list_text();
+        let (text, file_index) = HLS::get_video_list_text("videos");
 
         if text.is_none() {
             return;
@@ -155,7 +254,7 @@ impl HLS {
         Console::clear();
 
         if file_index == 0 {
-            Console::warning("No video found\n");
+            Console::warning("Video not found\n");
         } else {
             Console::println_color("List of videos".blue().bold());
             println!();
@@ -179,9 +278,16 @@ impl HLS {
 
         for path in &files_path {
             println!("path:{}", path.display().to_string());
-            let copy_result = fs::copy(path, &video_path.join(path.file_name().unwrap()));
+
+            let mut new_file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+            new_file_name = new_file_name.trim().to_lowercase().replace(" ", "_");
+            new_file_name = new_file_name.replace("&", "_and_");
+            new_file_name = new_file_name.replace("$", "_");
+
+            let copy_result = fs::copy(path, &video_path.join(&new_file_name));
 
             if copy_result.is_ok() {
+                Console::success(&new_file_name);
                 import_count += 1;
             }
         }
@@ -233,6 +339,14 @@ impl HLS {
 
         let mut index = 0;
 
+        let config_enc_key = HLS::site_dir_path().join("config").join("enc.keyinfo");
+
+        if (&config_enc_key).exists() == false {
+            Console::clear();
+            Console::error("Config file not found");
+            return;
+        }
+
         for result in files {
             index += 1;
 
@@ -247,6 +361,11 @@ impl HLS {
                         "# 🛠  Working on '{}' 🔻",
                         file.file_name().to_str().unwrap().blue().bold()
                     );
+
+                    if file.path().extension().unwrap().eq("mp4") == false {
+                        println!("{}", "   ❌ File not support".red());
+                        continue;
+                    }
 
                     let dir = hls_video_path.join(&file_name);
                     let directory = fs::create_dir(&dir);
@@ -265,6 +384,8 @@ impl HLS {
                         file_name.as_os_str().to_str().unwrap().blue().bold()
                     );
 
+                    let mut done_status = true;
+
                     for res in vec![360, 480, 720] {
                         let height = (res * 9 / 16) * 2;
 
@@ -280,6 +401,8 @@ impl HLS {
 
                         let status_run = Arc::new(Mutex::new(true));
                         let status_run_clone = Arc::clone(&status_run);
+
+                        let config_enc_key = config_enc_key.clone();
 
                         let timer = thread::spawn(move || {
                             // let res = 480;
@@ -305,15 +428,9 @@ impl HLS {
                                 .arg("-hls_time")
                                 .arg("2")
                                 .arg("-hls_key_info_file")
-                                .arg(
-                                    HLS::site_dir_path()
-                                        .join("config")
-                                        .join("enc.keyinfo")
-                                        .display()
-                                        .to_string(),
-                                )
+                                .arg(config_enc_key.display().to_string())
                                 .arg(format!(
-                                    "{}/video'.{}p.m3u8",
+                                    "{}/video.{}p.m3u8",
                                     save_path.display().to_string(),
                                     res
                                 ))
@@ -365,16 +482,22 @@ impl HLS {
                                 break;
                             }
                         }
+
                         stdout.execute(cursor::Show).unwrap();
+
 
                         if *result_status.lock().unwrap() {
                             println!(
-                                "   ✅  {} {} pixel in {}",
+                                "   ✅  {} {} pixel {}",
                                 "Created".green().bold(),
                                 res.to_string().green().bold(),
                                 HLS::format_duration(index_sec)
                             );
                         } else {
+
+                            
+                            done_status = false;
+
                             println!(
                                 "   ❌  {} {} pixel in {}",
                                 "Error".red().bold(),
@@ -384,50 +507,21 @@ impl HLS {
                         }
 
                         timer.join().unwrap();
+                    } // end convert all files
+
+
+                    // If the conversion is done correctly
+                    if done_status {
+
+                        // get hash string
+                        let hash = HLS::add_text_to_log(&file.path());
+
+                        // show video hash
+                        println!(
+                            "   ✅  Video hash : {}",
+                            hash.green().bold().italic(),
+                        );
                     }
-
-                    // let get_str = HLS::get_command_string_hls(
-                    //     video_path.join(&file_name).display().to_string(),
-                    //     hls_video_path.join(&file_name).display().to_string(),
-                    //     String::from("video"),
-                    // );
-                    // println!("{}", get_str);
-                    // let output = Command::new("ffmpeg")
-                    //     .arg("-i")
-                    //     .arg(video_path.join(file_path))
-                    //     .arg(hls_video_path)
-                    //     .output();
-
-                    // let command = Command::new("ffmpeg");
-
-                    // command.arg(arg);
-                    // thread::spawn(move ||{
-                    // let output = Command::new("ffmpeg")
-                    //     .arg("-i")
-                    //     .arg("/app/fara_option/target/debug/faramadrak.com/videos/fff.mp4")
-                    //     .arg("-c:a")
-                    //     .arg("aac")
-                    //     .arg("-strict")
-                    //     .arg("experimental")
-                    //     .arg("-c:v")
-                    //     .arg("libx264")
-                    //     .arg("-s")
-                    //     .arg("640x360")
-                    //     .arg("-aspect")
-                    //     .arg("16:9")
-                    //     .arg("-f")
-                    //     .arg("hls")
-                    //     .arg("-hls_list_size")
-                    //     .arg("1000000")
-                    //     .arg("-hls_time")
-                    //     .arg("2")
-                    //     .arg("-hls_key_info_file")
-                    //     .arg("/app/fara_option/target/debug/faramadrak.com/config/enc.keyinfo")
-                    //     .arg("/app/fara_option/target/debug/faramadrak.com/hls_videos/fff.mp4/video'.360p.m3u8")
-                    //     // .arg("2>&1")
-                    //     .output().unwrap();
-
-                    // }).join();
                 }
                 Err(_) => todo!(),
                 // Err(_) => {}
@@ -468,25 +562,59 @@ impl HLS {
     }
 
     pub fn select_key_file() {
-        let to = HLS::site_dir_path();
-        let path = FileDialog::new()
+        let site_path = HLS::site_dir_path();
+        let files_path = FileDialog::new()
             .set_location("~/Desktop")
-            .add_filter("keyinfo", &["keyinfo"])
-            .show_open_single_file()
+            .add_filter("keyinfo", &["keyinfo", "key"])
+            .show_open_multiple_file()
             .unwrap();
 
-        match path {
-            Some(path) => {
-                let c = fs::copy(path, to.join("config/enc.keyinfo"));
+        let mut import_index = 0;
 
-                match c {
-                    Ok(cc) => {}
-                    Err(err) => {
-                        println!("{}", err);
+        for path in files_path {
+            let file_name = path.file_name().clone().unwrap().to_str().unwrap();
+
+            let to = site_path.join("config").join(&file_name);
+
+            let c = fs::copy(&path, &to);
+
+            if c.is_ok() {
+                import_index += 1;
+            }
+
+            if (&path).extension().unwrap().eq("keyinfo") {
+                let text = fs::read_to_string(&path);
+
+                match text {
+                    Ok(text) => {
+                        let path_enc = HLS::site_dir_path().join("config").join("enc.key");
+
+                        let lines: Vec<&str> = text.lines().collect();
+
+                        let mut new_str = String::new();
+
+                        for (i, line) in lines.iter().enumerate() {
+                            if i == 1 {
+                                new_str.push_str(path_enc.display().to_string().as_str());
+                            } else {
+                                new_str.push_str(&line);
+                            }
+                            new_str.push('\n');
+                        }
+
+                        let _ = fs::write(&to, new_str);
                     }
+                    Err(_) => {}
                 }
             }
-            None => {}
+
+            Console::clear();
+
+            if import_index == 2 {
+                Console::success("Config file added\n");
+            } else {
+                Console::warning("Both 'enc.keyinfo' and 'enc.key' files must be selected for the program to function properly\n");
+            }
         }
     }
 

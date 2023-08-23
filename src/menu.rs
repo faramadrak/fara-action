@@ -154,12 +154,15 @@ impl Menu {
             }
             else if item.action == "select_hls_key_file"{
                 HLS::select_key_file();
+                self.show_current_menu(false)
             }
             else if item.action == "create_new_hls_key"{
                 HLS::create_new_key();
             }
             else if item.action == "hls_all"{
                 HLS::start_all_video();
+                Console::continue_input();
+                self.show_current_menu(true);
             }
             else if item.action == "import_new_video"{
                 HLS::add_a_video();
@@ -171,6 +174,10 @@ impl Menu {
             }
             else if item.action == "remove_all_org_videos"{
                 HLS::remove_all_org_videos();
+                self.show_current_menu(false)
+            }
+            else if item.action == "remove_all_hls_videos"{
+                HLS::remove_all_hls_videos();
                 self.show_current_menu(false)
             }
         }
