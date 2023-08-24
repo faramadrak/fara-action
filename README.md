@@ -1,5 +1,5 @@
 # Fara Action
-FaraAction is an open source program that is developed with rust and is under the console, which can be used to convert mp videos to hls along with encoding. You can add a watermark to the video, and it also creates files in three resolutions: 360, 480, and 720.
+FaraAction is an open source program that is developed with rust, which can be used to convert mp4 videos to HLS along with encoding. You can add a watermark to the video, and it also creates files in three resolutions: 360, 480, and 720.
 
 
 ## Install on Windows
