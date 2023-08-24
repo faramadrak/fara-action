@@ -26,7 +26,7 @@ pub struct SiteJson {
 
 #[derive(Serialize, Deserialize)]
 pub struct SiteListJson {
-    sites: Vec<SiteJson>,
+    pub sites: Vec<SiteJson>,
     current: String,
 }
 
@@ -37,7 +37,7 @@ pub struct Site {
 impl Site {
 
 
-    fn get_config_file_path() -> PathBuf {
+   pub fn get_config_file_path() -> PathBuf {
         let mut path = env::current_exe().expect("Unable to get current executable path");
         path.set_file_name("sites.conf");
 
@@ -72,14 +72,14 @@ impl Site {
         Site::save_config(config);
     }
 
-    fn get_config() -> SiteListJson {
+    pub fn get_config() -> SiteListJson {
         let config_str = Site::get_config_string();
         
         serde_json::from_str(&config_str)
             .expect(&format!("Error in parse json: {}", config_str).to_string())
     }
 
-    fn save_config(sites: SiteListJson) {
+    pub fn save_config(sites: SiteListJson) {
         let result = serde_json::to_string(&sites);
         let config_file_path = Site::get_config_file_path();
 

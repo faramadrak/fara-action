@@ -1,23 +1,16 @@
 use std::env;
-use std::error::Error;
-use std::f32::consts::E;
 use std::fs;
-use std::fs::metadata;
 use std::fs::File;
-use std::io;
 use std::io::stdout;
 use std::io::Read;
 use std::io::Stdout;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
-use std::thread::JoinHandle;
 use std::time;
-use std::time::Duration;
 
 use chrono::Local;
 use crossterm::cursor;
@@ -26,27 +19,31 @@ use crossterm::terminal;
 use crossterm::ExecutableCommand;
 use crossterm::QueueableCommand;
 use native_dialog::FileDialog;
-
+use crate::watermark::Watermark;
 use crate::console::Console;
 use crate::Site;
-use rand::distributions::Alphanumeric;
 use rand::Rng;
-use std::os::unix::fs::PermissionsExt;
-// use hex_literal::hex;
 
-pub struct HLS_Log {
-    date_time: String,
-    video_name: String,
-    Video_hash: String,
-}
-
-pub struct HLS_list_log {
-    list: Vec<HLS_Log>,
-}
 
 pub struct HLS {}
 
 impl HLS {
+
+    pub fn show_history(){
+        let site_path = HLS::site_dir_path();
+        let log_path = site_path.join("config").join("hls.logs.json");
+
+        // let mut log_path = String::new();
+        let mut get_log_file = fs::read_to_string(&log_path).unwrap();
+        
+        Console::clear();
+        println!("HLS History {}", "(the newest \\/ )\n".green().bold());
+        println!("{}",get_log_file);
+
+        Console::continue_input();
+
+    }
+
     fn add_text_to_log(file_path: &PathBuf)->String {
         let file_name = &file_path.file_name().unwrap();
         let site_path = HLS::site_dir_path();
@@ -74,10 +71,10 @@ impl HLS {
 
 
         
-        if count > 40{
+        if count > 39{
             let mut new_lines = String::new();
             for (i,line) in lines.iter().enumerate(){
-                if i > 40{
+                if i > 39{
                     break;
                 }
                 new_lines.push_str(&line);
@@ -112,7 +109,7 @@ impl HLS {
         path
     }
 
-    fn site_dir_path() -> PathBuf {
+    pub fn site_dir_path() -> PathBuf {
         let mut path = HLS::root_path();
         let mut current = Site::get_current();
         path = path.join(current.unwrap().title);
@@ -386,7 +383,7 @@ impl HLS {
 
                     let mut done_status = true;
 
-                    for res in vec![360, 480, 720] {
+                    for res in vec![320, 480, 720] {
                         let height = (res * 9 / 16) * 2;
 
                         let file_path: String = file.path().display().to_string();
@@ -407,7 +404,8 @@ impl HLS {
                         let timer = thread::spawn(move || {
                             // let res = 480;
 
-                            let output = Command::new("ffmpeg")
+                            let mut binding = Command::new("ffmpeg");
+                            let mut ob = binding
                                 .arg("-i")
                                 .arg(file_path)
                                 .arg("-c:a")
@@ -433,10 +431,27 @@ impl HLS {
                                     "{}/video.{}p.m3u8",
                                     save_path.display().to_string(),
                                     res
-                                ))
+                                ));
+
+                                let current = Site::get_current().unwrap();
+                                let watermark = serde_json::from_str(&current.watermark);
+                                match watermark {
+                                    Ok(wob)=>{
+                                        let watermark_ob :Watermark = wob;
+
+                                        if watermark_ob.image.len() > 4 {
+                                            let site_path_temp = HLS::site_dir_path();
+                                            ob.arg("-i")
+                                            .arg(site_path_temp.join("config").join(watermark_ob.image))
+                                            .arg("-filter_complex")
+                                            .arg("[1]scale=iw*0.025:-1[wm];[0][wm]overlay=x=(main_w-overlay_w-10):y=10");
+                                        }
+                                    }
+                                    Err(_)=>{}
+                                }
                                 // .stdout(Stdio::piped())
                                 // .stderr(Stdio::inherit())
-                                .output()
+                                let output = ob.output()
                                 .unwrap();
 
                             if output.status.success() {

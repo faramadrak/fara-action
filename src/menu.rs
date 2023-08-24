@@ -5,6 +5,7 @@ use crate::MenuItem;
 use crate::Console;
 use crate::site::Site;
 use crate::hls::HLS;
+use crate::watermark::Watermark;
 
 pub struct Menu{
     list:Vec<MenuList>,
@@ -178,6 +179,31 @@ impl Menu {
             }
             else if item.action == "remove_all_hls_videos"{
                 HLS::remove_all_hls_videos();
+                self.show_current_menu(false)
+            }
+
+            else if item.action == "how_hls_history"{
+                HLS::show_history();
+                self.show_current_menu(true)
+            }
+            else if item.action == "add_watermark_image"{
+                Watermark::add_image();
+                self.show_current_menu(false)
+            }
+            else if item.action == "remove_watermark"{
+                Watermark::remove_image();
+                self.show_current_menu(false)
+            }
+            else if item.action == "set_size_w_360"{
+                Watermark::set_size("360".to_string());
+                self.show_current_menu(false)
+            }
+            else if item.action == "set_size_w_480"{
+                Watermark::set_size("480".to_string());
+                self.show_current_menu(false)
+            }
+            else if item.action == "set_size_w_720"{
+                Watermark::set_size("720".to_string());
                 self.show_current_menu(false)
             }
         }
