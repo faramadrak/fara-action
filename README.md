@@ -3,7 +3,7 @@
 
 ## Install on Windows
 
-### - [Download ffmpeg](https://github.com/faramadrak/fara-action/releases/download/ffmpeg-6/ffmpeg-6.exe)
+### - [Download FFmpeg](https://github.com/faramadrak/fara-action/releases/download/ffmpeg-6/ffmpeg-6.exe)
 
 <br>
 <br>
