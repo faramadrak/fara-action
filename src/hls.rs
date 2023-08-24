@@ -23,11 +23,68 @@ use crate::watermark::Watermark;
 use crate::console::Console;
 use crate::Site;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 
-pub struct HLS {}
+#[derive(Serialize, Deserialize)]
+pub struct HLS {
+    pub custom_path:String
+}
 
 impl HLS {
+
+    pub fn get_config()->HLS{
+        let current = Site::get_current().unwrap();
+
+        let mut hls_str = current.hls;
+
+
+        let hls_ob= serde_json::from_str(&hls_str);
+
+        match hls_ob {
+            Ok(ob)=>{
+                let ob_str:HLS = ob;
+
+                return ob_str;
+            }
+            Err(_)=>{
+                return HLS{custom_path:"".to_string()}
+            }
+        }
+
+    }
+
+    pub fn set_custom_path_hls(){
+        Console::clear();
+
+        println!("{}","In this section, you can specify the path of mu and ts files \nfor example:\n");
+        println!("{}\nOR\n{}","/download/hls/content".blue(),"?path=download/{file_name}/".blue());
+        println!();
+        println!("In the above expression, the file name is automatically replaced with {{file_name}}");
+        println!();
+        Console::print("Enter path: ");
+        let get = Console::input();
+
+        let mut hls_config = HLS::get_config();
+        hls_config.custom_path = get.clone();
+
+       
+
+        let site_current_config = Site::get_current().unwrap();
+        let mut sites = Site::get_config();
+
+        for site in sites.sites.iter_mut(){
+            if site.title == site_current_config.title{
+                site.hls = serde_json::to_string(&hls_config).unwrap();
+            }
+        }
+
+        Site::save_config(sites);
+
+        Console::clear();
+        Console::success(&format!("Custom hls path updated to {}", get));
+        println!();
+    }
 
     pub fn show_history(){
         let site_path = HLS::site_dir_path();
@@ -383,7 +440,7 @@ impl HLS {
 
                     let mut done_status = true;
 
-                    for res in vec![320, 480, 720] {
+                    for res in vec![360, 480, 720] {
                         let height = (res * 9 / 16) * 2;
 
                         let file_path: String = file.path().display().to_string();
@@ -528,8 +585,22 @@ impl HLS {
                     // If the conversion is done correctly
                     if done_status {
 
+                        let mut m3u8:String = "#EXTM3U\n".to_string();
+                        m3u8.push_str("#EXT-X-STREAM-INF:BANDWIDTH=375000,RESOLUTION=640x360\n");
+                        m3u8.push_str("video.360p.m3u8\n");
+                        m3u8.push_str("#EXT-X-STREAM-INF:BANDWIDTH=750000,RESOLUTION=854x480\n");
+                        m3u8.push_str("video.480p.m3u8\n");
+                        m3u8.push_str("#EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720\n");
+                        m3u8.push_str("video.720p.m3u8\n");
+
+                        // let file_path: String = file.path().display().to_string();
+                        let save_path = hls_video_path.join(&file_name);
+                        let _ = fs::write(&save_path.join("video.m3u8"), m3u8);
+
+
                         // get hash string
                         let hash = HLS::add_text_to_log(&file.path());
+                        HLS::set_custom_path_to_m3u8_files(dir);
 
                         // show video hash
                         println!(
@@ -564,6 +635,44 @@ impl HLS {
         //         eprintln!("Failed to execute FFmpeg command: {}", error);
         //     }
         // }
+    }
+
+
+    pub fn set_custom_path_to_m3u8_files(dir_path:PathBuf){
+        let files = fs::read_dir(&dir_path).unwrap();
+        let custom = HLS::get_config();
+
+        if custom.custom_path.is_empty(){
+            return;
+        }
+
+         for file in files{
+            match file {
+              Ok(de)=>{
+
+                let path = de.path().clone();
+                if path.is_file() && path.extension().unwrap().eq("m3u8"){
+
+                    let old_text = fs::read_to_string(&path).unwrap();
+                    let mut new_text = String::new();
+
+                    for line in old_text.lines(){
+                        if line.ends_with(".ts") || line.ends_with(".m3u8"){
+                            new_text.push_str(&format!("{}{}\n",custom.custom_path, line).as_str());
+                        }
+                        else{
+                            new_text.push_str(format!("{}\n",line).as_str());
+                        }
+                    }
+
+                    let _ = fs::write(path, new_text);
+                }
+
+              } 
+              Err(_)=>{} 
+            }
+         }
+
     }
 
     pub fn get_command_string_hls(

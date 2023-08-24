@@ -206,6 +206,10 @@ impl Menu {
                 Watermark::set_size("720".to_string());
                 self.show_current_menu(false)
             }
+            else if item.action =="set_custom_path_hls"{
+                HLS::set_custom_path_hls();
+                self.show_current_menu(false)
+            }
         }
         else{
             Console::clear();
