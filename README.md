@@ -5,6 +5,8 @@ FaraAction is an open source program that is developed with rust, which can be u
 ## Install on Windows
 
 ### - [Download FFmpeg](https://github.com/faramadrak/fara-action/releases/download/ffmpeg-6/ffmpeg-6.exe)
+### - [Download Fara Action v1.0.3](https://github.com/faramadrak/fara-action/releases/download/1.0.3/FaraAction-win-setup-v1.0.3.exe)
+
 
 <br>
 <br>
