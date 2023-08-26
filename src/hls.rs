@@ -58,9 +58,7 @@ impl HLS {
         Console::clear();
 
         println!("{}","In this section, you can specify the path of mu and ts files \nfor example:\n");
-        println!("{}\nOR\n{}","/download/hls/content".blue(),"?path=download/{file_name}/".blue());
-        println!();
-        println!("In the above expression, the file name is automatically replaced with {{file_name}}");
+        println!("{}","/download/hls/content".blue());
         println!();
         Console::print("Enter path: ");
         let get = Console::input();
@@ -90,7 +88,15 @@ impl HLS {
         let site_path = HLS::site_dir_path();
         let log_path = site_path.join("config").join("hls.logs.json");
 
-        // let mut log_path = String::new();
+        if log_path.exists() == false{
+            Console::clear();
+            Console::warning("History not found");
+            println!();
+            Console::continue_input();
+
+            return;
+        }
+
         let mut get_log_file = fs::read_to_string(&log_path).unwrap();
         
         Console::clear();
@@ -255,7 +261,7 @@ impl HLS {
         if answer.to_lowercase() == "yes" {
             let path = HLS::site_dir_path().join("videos");
             let result = fs::remove_dir_all(&path);
-            fs::create_dir_all(path);
+            let _ = fs::create_dir_all(path);
 
             if result.is_ok() {
                 Console::success("All files were deleted\n");
@@ -459,7 +465,6 @@ impl HLS {
                         let config_enc_key = config_enc_key.clone();
 
                         let timer = thread::spawn(move || {
-                            // let res = 480;
 
                             let mut binding = Command::new("ffmpeg");
                             let mut ob = binding
@@ -472,7 +477,6 @@ impl HLS {
                                 .arg("-c:v")
                                 .arg("libx264")
                                 .arg("-s")
-                                // .arg(format!("{}x{}", res, res * 9 / 16))
                                 .arg(format!("{}x{}", res, height)) // Use the calculated height
                                 .arg("-aspect")
                                 .arg("16:9")
@@ -496,12 +500,24 @@ impl HLS {
                                     Ok(wob)=>{
                                         let watermark_ob :Watermark = wob;
 
+                                        let mut width = String::new();
+
+                                        if res == 360{
+                                            width = watermark_ob.size360p;
+                                        }
+                                        else if res == 480 {
+                                            width = watermark_ob.size480p;
+                                        }
+                                        else if res == 720 {
+                                            width = watermark_ob.size720p;
+                                        }
+
                                         if watermark_ob.image.len() > 4 {
                                             let site_path_temp = HLS::site_dir_path();
                                             ob.arg("-i")
                                             .arg(site_path_temp.join("config").join(watermark_ob.image))
                                             .arg("-filter_complex")
-                                            .arg("[1]scale=iw*0.025:-1[wm];[0][wm]overlay=x=(main_w-overlay_w-10):y=10");
+                                            .arg(format!("[1]scale=iw*{}:-1[wm];[0][wm]overlay=x=(main_w-overlay_w-10):y=10",width));
                                         }
                                     }
                                     Err(_)=>{}
@@ -609,8 +625,7 @@ impl HLS {
                         );
                     }
                 }
-                Err(_) => todo!(),
-                // Err(_) => {}
+                Err(_) => {},
             }
         }
 
@@ -620,21 +635,6 @@ impl HLS {
             return;
         }
 
-        // match output {
-        //     Ok(success) => {
-        //         if success.status.success() {
-        //             println!("FFmpeg command executed successfully!");
-        //         } else {
-        //             eprintln!(
-        //                 "FFmpeg command failed with error code: {:?}",
-        //                 success.status
-        //             );
-        //         }
-        //     }
-        //     Err(error) => {
-        //         eprintln!("Failed to execute FFmpeg command: {}", error);
-        //     }
-        // }
     }
 
 
@@ -675,15 +675,7 @@ impl HLS {
 
     }
 
-    pub fn get_command_string_hls(
-        input_path: String,
-        output_path: String,
-        save_name: String,
-    ) -> String {
-        let keyinfo = HLS::site_dir_path().join("config").join("enc.keyinfo");
-        format!("ffmpeg -i '{}'  -c:a aac -strict experimental -c:v libx264 -s 640x360 -aspect 16:9 -f hls -hls_list_size 1000000 -hls_time 2 -hls_key_info_file {} '{}/{}'.360p.m3u8 2>&1",
-         input_path,keyinfo.display().to_string(), output_path, save_name).to_string()
-    }
+
 
     pub fn select_key_file() {
         let site_path = HLS::site_dir_path();
