@@ -12,6 +12,10 @@ use std::sync::Mutex;
 use std::thread;
 use std::time;
 
+use crate::console::Console;
+use crate::menu::Menu;
+use crate::watermark::Watermark;
+use crate::Site;
 use chrono::Local;
 use crossterm::cursor;
 use crossterm::style::Stylize;
@@ -19,46 +23,44 @@ use crossterm::terminal;
 use crossterm::ExecutableCommand;
 use crossterm::QueueableCommand;
 use native_dialog::FileDialog;
-use crate::watermark::Watermark;
-use crate::console::Console;
-use crate::Site;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Serialize, Deserialize)]
 pub struct HLS {
-    pub custom_path:String
+    pub custom_path: String,
 }
 
 impl HLS {
-
-    pub fn get_config()->HLS{
+    pub fn get_config() -> HLS {
         let current = Site::get_current().unwrap();
 
         let mut hls_str = current.hls;
 
-
-        let hls_ob= serde_json::from_str(&hls_str);
+        let hls_ob = serde_json::from_str(&hls_str);
 
         match hls_ob {
-            Ok(ob)=>{
-                let ob_str:HLS = ob;
+            Ok(ob) => {
+                let ob_str: HLS = ob;
 
                 return ob_str;
             }
-            Err(_)=>{
-                return HLS{custom_path:"".to_string()}
+            Err(_) => {
+                return HLS {
+                    custom_path: "".to_string(),
+                }
             }
         }
-
     }
 
-    pub fn set_custom_path_hls(){
+    pub fn set_custom_path_hls() {
         Console::clear();
 
-        println!("{}","In this section, you can specify the path of mu and ts files \nfor example:\n");
-        println!("{}","/download/hls/content".blue());
+        println!(
+            "{}",
+            "In this section, you can specify the path of mu and ts files \nfor example:\n"
+        );
+        println!("{}", "/download/hls/content".blue());
         println!();
         Console::print("Enter path: ");
         let get = Console::input();
@@ -66,13 +68,11 @@ impl HLS {
         let mut hls_config = HLS::get_config();
         hls_config.custom_path = get.clone();
 
-       
-
         let site_current_config = Site::get_current().unwrap();
         let mut sites = Site::get_config();
 
-        for site in sites.sites.iter_mut(){
-            if site.title == site_current_config.title{
+        for site in sites.sites.iter_mut() {
+            if site.title == site_current_config.title {
                 site.hls = serde_json::to_string(&hls_config).unwrap();
             }
         }
@@ -84,11 +84,11 @@ impl HLS {
         println!();
     }
 
-    pub fn show_history(){
+    pub fn show_history() {
         let site_path = HLS::site_dir_path();
         let log_path = site_path.join("config").join("hls.logs.json");
 
-        if log_path.exists() == false{
+        if log_path.exists() == false {
             Console::clear();
             Console::warning("History not found");
             println!();
@@ -98,16 +98,15 @@ impl HLS {
         }
 
         let mut get_log_file = fs::read_to_string(&log_path).unwrap();
-        
+
         Console::clear();
         println!("HLS History {}", "(the newest \\/ )\n".green().bold());
-        println!("{}",get_log_file);
+        println!("{}", get_log_file);
 
         Console::continue_input();
-
     }
 
-    fn add_text_to_log(file_path: &PathBuf)->String {
+    fn add_text_to_log(file_path: &PathBuf) -> String {
         let file_name = &file_path.file_name().unwrap();
         let site_path = HLS::site_dir_path();
         let log_path = site_path.join("config").join("hls.logs.json");
@@ -129,26 +128,23 @@ impl HLS {
             &hash,
         );
 
-        let lines:Vec<&str> = get_log_file.lines().collect();
+        let lines: Vec<&str> = get_log_file.lines().collect();
         let count = lines.len();
 
-
-        
-        if count > 39{
+        if count > 39 {
             let mut new_lines = String::new();
-            for (i,line) in lines.iter().enumerate(){
-                if i > 39{
+            for (i, line) in lines.iter().enumerate() {
+                if i > 39 {
                     break;
                 }
                 new_lines.push_str(&line);
                 new_lines.push_str("\n");
-
             }
 
             get_log_file = new_lines;
         }
 
-        get_log_file = format!("{}{}",new_log_text, get_log_file); 
+        get_log_file = format!("{}{}", new_log_text, get_log_file);
 
         let _ = fs::write(log_path, get_log_file);
         hash
@@ -240,6 +236,57 @@ impl HLS {
             }
         }
         (Some(text), file_index)
+    }
+
+    pub fn show_resolutions_config() {
+        Console::clear();
+
+        let mut config = Site::get_config();
+
+        Console::print("Active resolutions:\n\n");
+
+        let mut index = 0;
+        for resolution in &config.resolutions {
+            index += 1;
+
+            if resolution.active {
+                let name: &str = &format!("{}) ✔️ {} is true", index, &resolution.name);
+                Console::println_color(name.green().bold());
+            } else {
+                let name: &str = &format!("{}) 🔘 {} is false", index, &resolution.name);
+                Console::println_color(name.grey());
+            }
+        }
+
+        Console::print("\n0) Back\n\n");
+
+        Console::print_color("Select the configuration to change: ".blue());
+        let answer = Console::input();
+
+        let s = answer.to_string();
+
+        match s.parse::<i32>() {
+            Ok(num) => {
+                if (num == 0) {
+                    Console::clear();
+                    return;
+                }
+                let mut index = 0;
+                // Use mutable references instead of moving
+                for resolution in &mut config.resolutions {
+                    index += 1;
+
+                    if num == index {
+                        resolution.active = !resolution.active;
+                        break;
+                    }
+                }
+
+                Site::save_config(config);
+                HLS::show_resolutions_config();
+            }
+            Err(e) => println!("Enter Latin number 😒"),
+        }
     }
 
     pub fn remove_all_org_videos() {
@@ -390,6 +437,14 @@ impl HLS {
         format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
     }
 
+    pub fn ffmpeg_exists() -> bool {
+        Command::new("ffmpeg")
+            .arg("-version")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
+
     pub fn start_all_video() {
         let site_path = HLS::site_dir_path();
         let video_path = site_path.join("videos").clone();
@@ -444,9 +499,22 @@ impl HLS {
                         file_name.as_os_str().to_str().unwrap().blue().bold()
                     );
 
-                    let mut done_status = true;
+                    if HLS::ffmpeg_exists() {
+                        println!("   ✅  ffmpeg");
+                    } else {
+                        eprintln!("   ❌  ffmpeg");
+                    }
 
-                    for res in vec![360, 480, 720] {
+                    let mut done_status = true;
+                    let config = Site::get_config();
+
+                    for resolution in &config.resolutions {
+                        if resolution.active == false {
+                            continue;
+                        }
+
+                        let res: i32 = resolution.name.parse().unwrap();
+
                         let height = (res * 9 / 16) * 2;
 
                         let file_path: String = file.path().display().to_string();
@@ -464,22 +532,45 @@ impl HLS {
 
                         let config_enc_key = config_enc_key.clone();
 
-                        let timer = thread::spawn(move || {
+                        let (crf, preset, audio_bitrate) = match res {
+                            1080 => ("20", "slow", "192k"),
+                            720 => ("21", "slow", "160k"),
+                            480 => ("23", "medium", "128k"),
+                            360 => ("24", "medium", "96k"),
+                            _ => ("22", "medium", "128k"), // حالت پیش‌فرض
+                        };
 
+                        let timer = thread::spawn(move || {
                             let mut binding = Command::new("ffmpeg");
                             let mut ob = binding
+                                // اگر می‌خواهی فایل قبلی را بدون سوال overwrite کند:
+                                .arg("-y")
                                 .arg("-i")
                                 .arg(file_path)
+                                // تنظیمات صدا
                                 .arg("-c:a")
                                 .arg("aac")
+                                .arg("-b:a")
+                                .arg(audio_bitrate)
+                                // اگر ffmpeg قدیمی بود می‌توانی این را نگه داری، ولی در نسخه‌های جدید تقریباً لازم نیست:
                                 .arg("-strict")
                                 .arg("experimental")
+                                // تنظیمات ویدیو
                                 .arg("-c:v")
                                 .arg("libx264")
+                                .arg("-preset")
+                                .arg(preset)
+                                .arg("-crf")
+                                .arg(crf)
+                                // برای سازگاری پلیرها
+                                .arg("-pix_fmt")
+                                .arg("yuv420p")
+                                // تغییر رزولوشن
                                 .arg("-s")
-                                .arg(format!("{}x{}", res, height)) // Use the calculated height
+                                .arg(format!("{}x{}", res, height))
                                 .arg("-aspect")
                                 .arg("16:9")
+                                // خروجی HLS
                                 .arg("-f")
                                 .arg("hls")
                                 .arg("-hls_list_size")
@@ -494,38 +585,37 @@ impl HLS {
                                     res
                                 ));
 
-                                let current = Site::get_current().unwrap();
-                                let watermark = serde_json::from_str(&current.watermark);
-                                match watermark {
-                                    Ok(wob)=>{
-                                        let watermark_ob :Watermark = wob;
+                            let current = Site::get_current().unwrap();
+                            let watermark = serde_json::from_str(&current.watermark);
+                            match watermark {
+                                Ok(wob) => {
+                                    let watermark_ob: Watermark = wob;
 
-                                        let mut width = String::new();
+                                    let mut width = String::new();
 
-                                        if res == 360{
-                                            width = watermark_ob.size360p;
-                                        }
-                                        else if res == 480 {
-                                            width = watermark_ob.size480p;
-                                        }
-                                        else if res == 720 {
-                                            width = watermark_ob.size720p;
-                                        }
+                                    if res == 360 {
+                                        width = watermark_ob.size360p;
+                                    } else if res == 480 {
+                                        width = watermark_ob.size480p;
+                                    } else if res == 720 {
+                                        width = watermark_ob.size720p;
+                                    } else if res == 1024 {
+                                        width = watermark_ob.size1080p;
+                                    }
 
-                                        if watermark_ob.image.len() > 4 {
-                                            let site_path_temp = HLS::site_dir_path();
-                                            ob.arg("-i")
+                                    if watermark_ob.image.len() > 4 {
+                                        let site_path_temp = HLS::site_dir_path();
+                                        ob.arg("-i")
                                             .arg(site_path_temp.join("config").join(watermark_ob.image))
                                             .arg("-filter_complex")
                                             .arg(format!("[1]scale=iw*{}:-1[wm];[0][wm]overlay=x=(main_w-overlay_w-10):y=10",width));
-                                        }
                                     }
-                                    Err(_)=>{}
                                 }
-                                // .stdout(Stdio::piped())
-                                // .stderr(Stdio::inherit())
-                                let output = ob.output()
-                                .unwrap();
+                                Err(_) => {}
+                            }
+                            // .stdout(Stdio::piped())
+                            // .stderr(Stdio::inherit())
+                            let output = ob.output().unwrap();
 
                             if output.status.success() {
                                 let mut run_mutex = status_run_clone.lock().unwrap();
@@ -573,7 +663,6 @@ impl HLS {
 
                         stdout.execute(cursor::Show).unwrap();
 
-
                         if *result_status.lock().unwrap() {
                             println!(
                                 "   ✅  {} {} pixel {}",
@@ -582,8 +671,6 @@ impl HLS {
                                 HLS::format_duration(index_sec)
                             );
                         } else {
-
-                            
                             done_status = false;
 
                             println!(
@@ -597,11 +684,9 @@ impl HLS {
                         timer.join().unwrap();
                     } // end convert all files
 
-
                     // If the conversion is done correctly
                     if done_status {
-
-                        let mut m3u8:String = "#EXTM3U\n".to_string();
+                        let mut m3u8: String = "#EXTM3U\n".to_string();
                         m3u8.push_str("#EXT-X-STREAM-INF:BANDWIDTH=375000,RESOLUTION=640x360\n");
                         m3u8.push_str("video.360p.m3u8\n");
                         m3u8.push_str("#EXT-X-STREAM-INF:BANDWIDTH=750000,RESOLUTION=854x480\n");
@@ -613,19 +698,15 @@ impl HLS {
                         let save_path = hls_video_path.join(&file_name);
                         let _ = fs::write(&save_path.join("video.m3u8"), m3u8);
 
-
                         // get hash string
                         let hash = HLS::add_text_to_log(&file.path());
                         HLS::set_custom_path_to_m3u8_files(dir);
 
                         // show video hash
-                        println!(
-                            "   ✅  Video hash : {}",
-                            hash.green().bold().italic(),
-                        );
+                        println!("   ✅  Video hash : {}", hash.green().bold().italic(),);
                     }
                 }
-                Err(_) => {},
+                Err(_) => {}
             }
         }
 
@@ -634,48 +715,41 @@ impl HLS {
             Console::warning(&format!("Put videos in '{}' path.", video_path.display()));
             return;
         }
-
     }
 
-
-    pub fn set_custom_path_to_m3u8_files(dir_path:PathBuf){
+    pub fn set_custom_path_to_m3u8_files(dir_path: PathBuf) {
         let files = fs::read_dir(&dir_path).unwrap();
         let custom = HLS::get_config();
 
-        if custom.custom_path.is_empty(){
+        if custom.custom_path.is_empty() {
             return;
         }
 
-         for file in files{
+        for file in files {
             match file {
-              Ok(de)=>{
+                Ok(de) => {
+                    let path = de.path().clone();
+                    if path.is_file() && path.extension().unwrap().eq("m3u8") {
+                        let old_text = fs::read_to_string(&path).unwrap();
+                        let mut new_text = String::new();
 
-                let path = de.path().clone();
-                if path.is_file() && path.extension().unwrap().eq("m3u8"){
-
-                    let old_text = fs::read_to_string(&path).unwrap();
-                    let mut new_text = String::new();
-
-                    for line in old_text.lines(){
-                        if line.ends_with(".ts") || line.ends_with(".m3u8"){
-                            new_text.push_str(&format!("{}{}\n",custom.custom_path, line).as_str());
+                        for line in old_text.lines() {
+                            if line.ends_with(".ts") || line.ends_with(".m3u8") {
+                                new_text.push_str(
+                                    &format!("{}{}\n", custom.custom_path, line).as_str(),
+                                );
+                            } else {
+                                new_text.push_str(format!("{}\n", line).as_str());
+                            }
                         }
-                        else{
-                            new_text.push_str(format!("{}\n",line).as_str());
-                        }
+
+                        let _ = fs::write(path, new_text);
                     }
-
-                    let _ = fs::write(path, new_text);
                 }
-
-              } 
-              Err(_)=>{} 
+                Err(_) => {}
             }
-         }
-
+        }
     }
-
-
 
     pub fn select_key_file() {
         let site_path = HLS::site_dir_path();

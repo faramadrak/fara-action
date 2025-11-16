@@ -6,28 +6,33 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Result, Value};
 
 use std::env;
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::fs;
-use std::sync::{Once};
-
-
+use std::sync::Once;
 
 static mut DATA: String = String::new();
 static ONCE: Once = Once::new();
 
 #[derive(Serialize, Deserialize)]
 pub struct SiteJson {
-   pub title: String,
-   pub watermark: String,
-   pub hls: String,
+    pub title: String,
+    pub watermark: String,
+    pub hls: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Resolution {
+    pub name: String, // یا String اگر ترجیح بدی "720" به‌صورت رشته باشه
+    pub active: bool,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct SiteListJson {
     pub sites: Vec<SiteJson>,
     current: String,
+    pub resolutions: Vec<Resolution>,
 }
 
 pub struct Site {
@@ -35,9 +40,7 @@ pub struct Site {
 }
 
 impl Site {
-
-
-   pub fn get_config_file_path() -> PathBuf {
+    pub fn get_config_file_path() -> PathBuf {
         let mut path = env::current_exe().expect("Unable to get current executable path");
         path.set_file_name("sites.conf");
 
@@ -45,11 +48,31 @@ impl Site {
     }
 
     fn get_config_string() -> String {
-
         let config_path = Site::get_config_file_path();
 
-        if config_path.exists() == false{
-            Site::save_config(SiteListJson { sites: vec![], current: "".to_string() })
+        if config_path.exists() == false {
+            Site::save_config(SiteListJson {
+                sites: vec![],
+                current: "".to_string(),
+                resolutions: vec![
+                    Resolution {
+                        name: "1080".to_string(),
+                        active: false,
+                    },
+                    Resolution {
+                        name: "720".to_string(),
+                        active: true,
+                    },
+                    Resolution {
+                        name: "480".to_string(),
+                        active: true,
+                    },
+                    Resolution {
+                        name: "360".to_string(),
+                        active: true,
+                    },
+                ],
+            })
         }
 
         // open config file
@@ -64,8 +87,7 @@ impl Site {
         config_str
     }
 
-
-    pub fn set_current(title:String){
+    pub fn set_current(title: String) {
         let mut config = Site::get_config();
         config.current = title;
 
@@ -74,7 +96,7 @@ impl Site {
 
     pub fn get_config() -> SiteListJson {
         let config_str = Site::get_config_string();
-        
+
         serde_json::from_str(&config_str)
             .expect(&format!("Error in parse json: {}", config_str).to_string())
     }
@@ -86,7 +108,8 @@ impl Site {
         match result {
             Ok(text) => {
                 // write string to config file
-                let mut new_file = File::create(config_file_path).expect("Unable to create config file");
+                let mut new_file =
+                    File::create(config_file_path).expect("Unable to create config file");
                 new_file
                     .write_all(text.as_bytes())
                     .expect("Unable to write to file");
@@ -97,14 +120,13 @@ impl Site {
         }
     }
 
-    pub fn get_current()->Option<SiteJson>{
-
+    pub fn get_current() -> Option<SiteJson> {
         let config = Site::get_config();
 
         let current_site_title = config.current;
 
-        for site in config.sites{
-            if(site.title == current_site_title){
+        for site in config.sites {
+            if (site.title == current_site_title) {
                 return Some(site);
             }
         }
@@ -112,7 +134,7 @@ impl Site {
         None
     }
 
-    pub fn count()->usize{
+    pub fn count() -> usize {
         let config = Site::get_config();
         config.sites.len()
     }
@@ -135,7 +157,6 @@ impl Site {
         Site::save_config(config);
     }
 
-
     pub fn process_save_new() {
         Console::clear();
 
@@ -154,14 +175,13 @@ impl Site {
         }
     }
 
-    pub fn show_site_list_and_select(){
+    pub fn show_site_list_and_select() {
         let mut text = String::new();
         let mut index = 0;
 
-
-        for site in Site::get_config().sites{
+        for site in Site::get_config().sites {
             index += 1;
-            text += &format!("{}) {}\n",index, site.title).to_string();
+            text += &format!("{}) {}\n", index, site.title).to_string();
         }
 
         Console::clear();
@@ -170,9 +190,9 @@ impl Site {
 
         let site_number = Console::input();
 
-        let (status,number) = Console::to_number(site_number);
-        
-        if status == false{
+        let (status, number) = Console::to_number(site_number);
+
+        if status == false {
             Console::clear();
             Console::error("Site number not currect.");
             Site::show_site_list_and_select();
@@ -181,23 +201,18 @@ impl Site {
 
         let config = Site::get_config();
 
-        if config.sites.get(number-1).is_some() ==false {
+        if config.sites.get(number - 1).is_some() == false {
             Console::clear();
             Console::error("Site number not currect.");
             Site::show_site_list_and_select();
             return;
         }
 
-        Site::set_current(config.sites[number-1].title.clone());
-        
-
+        Site::set_current(config.sites[number - 1].title.clone());
     }
 
-
-    pub fn set_first_to_currect(){
+    pub fn set_first_to_currect() {
         let config = Site::get_config();
         Site::set_current(config.sites[0].title.clone());
     }
-
-
 }

@@ -1,34 +1,36 @@
 use crossterm::style::Stylize;
 
-use crate::MenuList;
-use crate::MenuItem;
-use crate::Console;
-use crate::site::Site;
 use crate::hls::HLS;
+use crate::site::Site;
 use crate::watermark::Watermark;
+use crate::Console;
+use crate::MenuItem;
+use crate::MenuList;
 
-pub struct Menu{
-    list:Vec<MenuList>,
-    current:String,
-    history:Vec<String>
+pub struct Menu {
+    list: Vec<MenuList>,
+    current: String,
+    history: Vec<String>,
 }
 
-
 impl Menu {
-
-    pub fn new()->Menu{
-        Menu { list: vec![], current:String::from("main"), history:vec!["main".to_string()] }
+    pub fn new() -> Menu {
+        Menu {
+            list: vec![],
+            current: String::from("main"),
+            history: vec!["main".to_string()],
+        }
     }
 
-    pub fn add(&mut self, menu_list:MenuList){
+    pub fn add(&mut self, menu_list: MenuList) {
         self.list.push(menu_list);
     }
 
-    pub fn get_current_menu(&self)->Option<&MenuList>{
-        let mut current_menu :Option<&MenuList> = None;
+    pub fn get_current_menu(&self) -> Option<&MenuList> {
+        let mut current_menu: Option<&MenuList> = None;
 
-        for menu in self.list.iter(){
-            if menu.name == self.current{
+        for menu in self.list.iter() {
+            if menu.name == self.current {
                 current_menu = Some(menu);
             }
         }
@@ -36,34 +38,29 @@ impl Menu {
         current_menu
     }
 
-    pub fn get_current_menu_text(&self, current:Option<&MenuList>)->String{
-
+    pub fn get_current_menu_text(&self, current: Option<&MenuList>) -> String {
         let mut current_menu = current;
-
 
         let mut str = String::new();
 
         match current_menu {
-            Some(menu)=>{
+            Some(menu) => {
                 let mut index = 0;
 
-                for item in &menu.list{
+                for item in &menu.list {
                     //     index +=1;
-                    // str += &format!("🔹 {}) {}\n", index, item.name).to_string();                    
-                    if item.name == "Back"{
+                    // str += &format!("🔹 {}) {}\n", index, item.name).to_string();
+                    if item.name == "Back" {
                         // println!("{}","0) Back".yellow());
                         // println!();
                         str += &format!("◀️  {}) {}\n", 0, "Back").to_string();
-                    }
-                    else{
-                        index +=1;
+                    } else {
+                        index += 1;
                         str += &format!("🔹 {}) {}\n", index, item.name).to_string();
                     }
-
                 }
-
             }
-            None=>{
+            None => {
                 str = "Not Found Menu".to_string();
             }
         }
@@ -71,176 +68,155 @@ impl Menu {
         // "".to_string();
     }
 
-    pub fn show_current_menu(&mut self, clear:bool){
-        if clear{
+    pub fn show_current_menu(&mut self, clear: bool) {
+        if clear {
             Console::clear();
         }
 
         let current = self.get_current_menu();
-        
+
         let text = self.get_current_menu_text(current);
 
         match current {
-            Some(menu)=>{
-                if Site::get_current().is_some(){
+            Some(menu) => {
+                if Site::get_current().is_some() {
                     println!("🌐 {} 🔻", Site::get_current().unwrap().title.blue().bold());
                     println!();
                 }
-                println!(" 💬 {}\n",menu.description.clone().dark_cyan());
+                println!(" 💬 {}\n", menu.description.clone().dark_cyan());
                 println!("{}", text);
-        
+
                 self.get_input();
             }
-            None=>{
+            None => {
                 println!("Menu not found");
             }
         }
-
-
     }
 
-    pub fn get_input(&mut self){
+    pub fn get_input(&mut self) {
         Console::print_color("Enter the menu number: ".blue());
         let select = Console::input();
 
-        if select == "0"{
+        if select == "0" {
             self.back();
             self.show_current_menu(true);
-        }
-        else{
+        } else {
             self.check_action(select);
         }
     }
 
-    pub fn check_action(&mut self, select:String)
-    {
+    pub fn check_action(&mut self, select: String) {
+        let current = self
+            .get_current_menu()
+            .expect("Menu not found in 'check_action' in menu.rs");
 
-        let current = self.get_current_menu().expect("Menu not found in 'check_action' in menu.rs");
-        
         let number_convert = select.parse::<usize>();
-        let mut number_select:usize = 0;
+        let mut number_select: usize = 0;
         let mut valid_convert = false;
 
         match number_convert {
-            Ok(number)=>{
-                number_select = number-1;
+            Ok(number) => {
+                number_select = number - 1;
                 valid_convert = true;
             }
-            Err(_)=>{}
+            Err(_) => {}
         }
 
-
-        
-        if valid_convert && current.list.get(number_select).is_some() && current.list[number_select].has_action == false{
-
+        if valid_convert
+            && current.list.get(number_select).is_some()
+            && current.list[number_select].has_action == false
+        {
             let item = &current.list[number_select];
             self.current = item.show_menu.clone();
             self.show_current_menu(true);
-        }
-        else if current.list.get(number_select).is_some() && current.list[number_select].has_action == true{
+        } else if current.list.get(number_select).is_some()
+            && current.list[number_select].has_action == true
+        {
             let item = &current.list[number_select];
 
             if item.action == "add_site" {
                 Site::process_save_new();
                 self.show_current_menu(false);
-            }
-            else if item.action == "close_app"{
+            } else if item.action == "close_app" {
                 Console::println_color("Goodbay 👋".green());
                 std::process::exit(0);
-            }
-            else if item.action == "select_a_site"{
+            } else if item.action == "select_a_site" {
                 Site::show_site_list_and_select();
                 self.clear_history();
                 self.show_current_menu(true);
-            }
-            else if item.action == "select_hls_key_file"{
+            } else if item.action == "select_hls_key_file" {
                 HLS::select_key_file();
                 self.show_current_menu(false)
-            }
-            else if item.action == "create_new_hls_key"{
+            } else if item.action == "create_new_hls_key" {
                 HLS::create_new_key();
-            }
-            else if item.action == "hls_all"{
+            } else if item.action == "hls_all" {
                 HLS::start_all_video();
                 Console::continue_input();
                 self.show_current_menu(true);
-            }
-            else if item.action == "import_new_video"{
+            } else if item.action == "import_new_video" {
                 HLS::add_a_video();
                 self.show_current_menu(false)
-            }
-            else if item.action == "show_all_video_list"{
+            } else if item.action == "show_all_video_list" {
                 HLS::show_files_list();
                 self.show_current_menu(false)
-            }
-            else if item.action == "remove_all_org_videos"{
+            } else if item.action == "remove_all_org_videos" {
                 HLS::remove_all_org_videos();
                 self.show_current_menu(false)
-            }
-            else if item.action == "remove_all_hls_videos"{
+            } else if item.action == "remove_all_hls_videos" {
                 HLS::remove_all_hls_videos();
                 self.show_current_menu(false)
-            }
-
-            else if item.action == "how_hls_history"{
+            } else if item.action == "how_hls_history" {
                 HLS::show_history();
                 self.show_current_menu(true)
-            }
-            else if item.action == "add_watermark_image"{
+            } else if item.action == "add_watermark_image" {
                 Watermark::add_image();
                 self.show_current_menu(false)
-            }
-            else if item.action == "remove_watermark"{
+            } else if item.action == "remove_watermark" {
                 Watermark::remove_image();
                 self.show_current_menu(false)
-            }
-            else if item.action == "set_size_w_360"{
+            } else if item.action == "set_size_w_360" {
                 Watermark::set_size("360".to_string());
                 self.show_current_menu(false)
-            }
-            else if item.action == "set_size_w_480"{
+            } else if item.action == "set_size_w_480" {
                 Watermark::set_size("480".to_string());
                 self.show_current_menu(false)
-            }
-            else if item.action == "set_size_w_720"{
+            } else if item.action == "set_size_w_720" {
                 Watermark::set_size("720".to_string());
                 self.show_current_menu(false)
-            }
-            else if item.action =="set_custom_path_hls"{
+            } else if item.action == "set_size_w_1080" {
+                Watermark::set_size("1080".to_string());
+                self.show_current_menu(false)
+            } else if item.action == "set_custom_path_hls" {
                 HLS::set_custom_path_hls();
                 self.show_current_menu(false)
+            } else if item.action == "set_resolutions" {
+                HLS::show_resolutions_config();
+                self.show_current_menu(false)
             }
-        }
-        else{
+        } else {
             Console::clear();
             Console::warning("Menu not found");
             println!();
             self.show_current_menu(false);
         }
-
-
     }
 
-    pub fn back(&mut self){
-
-        if self.history.len()> 1 {
+    pub fn back(&mut self) {
+        if self.history.len() > 1 {
             self.history.pop();
         }
-        
-        self.current = self.history.last().unwrap().to_string();
 
+        self.current = self.history.last().unwrap().to_string();
     }
 
-    pub fn clear_history(&mut self){
-
+    pub fn clear_history(&mut self) {
         self.history = vec!["main".to_string()];
-        
-        self.current = self.history.last().unwrap().to_string();
 
+        self.current = self.history.last().unwrap().to_string();
     }
 
     // pub fn set_to_current_menu(){
 
     // }
-    
 }
