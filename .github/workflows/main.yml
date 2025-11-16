@@ -16,12 +16,15 @@ jobs:
             archive: tar.gz tar.xz tar.zst
           - target: x86_64-apple-darwin
             archive: zip
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # بهتر از master
+
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.4.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TOOLCHAIN_VERSION: 1.78.0   # یا مثلاً "stable"
         with:
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}
