@@ -810,7 +810,7 @@ impl HLS {
 
     fn generate_secret_token() -> String {
         let hex_string: String = (0..16)
-            .map(|_| format!("{:02x}", rand::thread_rng().gen::<u8>()))
+            .map(|_| format!("{:02x}", rand::thread_rng().r#gen::<u8>()))
             .collect();
 
         hex_string
